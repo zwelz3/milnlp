@@ -12,8 +12,11 @@ setup(
         "data mining",
         "NLP",
         "natural language processing",
+        "knowledge management",
+        "summarization"
     ],
     install_requires=[
         "pycountry>=18.2.23",
         "nltk>=3.0.2",
+        "sumy>=0.7.0",
     ],)

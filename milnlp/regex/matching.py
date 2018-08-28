@@ -4,10 +4,11 @@ import re
 class Match(object):
     """Prototype for text that matches RegEx patterns."""
 
-    def __init__(self, pos, ttype, groups):
+    def __init__(self, pos, ttype, groups=None):
         self.position = pos
         self.type = ttype
-        self.capture_groups = groups
+        if groups:
+            self.capture_groups = groups
 
 
 class MatchBook(object):
@@ -37,7 +38,7 @@ class MatchBook(object):
                 for match in matches:
                     starting_pos = match.span()[0]
                     print('pos: ', starting_pos, ' -> ', match.groups()) if print_matches else None
-                    self.add_match(Match(starting_pos, attr, match.groups()))
+                    self.add_match(Match(starting_pos, attr, groups=match.groups()))
                 print("") if print_matches else None
 
         # Update position map
@@ -56,7 +57,7 @@ class MatchBook(object):
 
     def build_text(self):
         """docstring"""
-        # TODO shift top level from exhibit to program element
+        # TODO shift top level from exhibit to program element (make this an option for extensibility)
         exhibit_a = None  # engineering humor
         flag_print = True
         exhibit_text = []

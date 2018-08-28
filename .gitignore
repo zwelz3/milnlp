@@ -1,8 +1,6 @@
-drawingboard.txt
 .idea/
 .ipynb_checkpoints/
 */.ipynb_checkpoints/
-Examples/Archive/
+**/Archive/
+**/__pycache__/
 milnlp.egg-info/
-milnlp/__pycache__/
-milnlp/regex/__pycache__/
