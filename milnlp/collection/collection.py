@@ -248,7 +248,7 @@ class Collection(object):
         """Uses the raw file list to instantiate a Query object"""
         return Query(self.flist)
 
-    def make_query(self, query):
+    def make_query(self, query, case_sensitive=False):
         """Runs the query on the collection"""
         # Build query object
         qobj = self.build_query()
@@ -258,12 +258,12 @@ class Collection(object):
             qmethod = 'union'
             phrase = f"Performing {qmethod} query..."
             print(phrase)
-            query_results = qobj.union_query(query)
+            query_results = qobj.union_query(query, case_sensitive=case_sensitive)
         elif type(query[0]) is list and type(query[0][0]) is tuple:
             qmethod = 'intersect'
             phrase = f"Performing {qmethod} query..."
             print(phrase)
-            query_results = qobj.intersect_query(query)
+            query_results = qobj.intersect_query(query, case_sensitive=case_sensitive)
         else:
             raise TypeError('Format of query is not list of tuples (union) or list of lists of tuples (intersection')
         print("Done!")

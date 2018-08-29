@@ -9,7 +9,7 @@ class Query(object):
     def __init__(self, flist):
         self.files = flist
 
-    def union_query(self, query_list, buffer=0):
+    def union_query(self, query_list, case_sensitive=False, buffer=0):
         """Takes a query list and list of .txt file paths and returns matching files and their page numbers.
            Note, the check is case insensitive.
            Note, if a query has a single item, the tuple must be created correctly ('item_one',) <- notice the comma.
@@ -48,7 +48,10 @@ class Query(object):
                     for query in query_list:
                         result_key = ', '.join([element for element in query])  # used for dict
                         re_pattern = '|'.join([term for term in query])
-                        re_filter = re.compile(re_pattern, re.IGNORECASE)
+                        if case_sensitive:
+                            re_filter = re.compile(re_pattern)
+                        else:
+                            re_filter = re.compile(re_pattern, re.IGNORECASE)
                         if re_filter.findall(page_text):
                             # print("  -->  Found at least 1 match for pattern: ", re_pattern)
                             if file not in query_results[result_key]:
@@ -57,7 +60,7 @@ class Query(object):
 
         return query_results
 
-    def intersect_query(self, query_set, buffer=0):
+    def intersect_query(self, query_set, case_sensitive=False, buffer=0):
         """Takes a list of query_lists (for union) and finds the intersection.
            Uses the regex_query as a baseline search, therefore the following behavior should be expected:
              - tuples within a list of queries are unionized
@@ -67,7 +70,7 @@ class Query(object):
         assert len(query_set) > 1, "Cannot compute intersection of a single query"''
         # todo check to make sure every query is a tuple
         for ii, queries in enumerate(query_set):
-            results = self.union_query(queries)  # query results for one 'queries'
+            results = self.union_query(queries, case_sensitive=case_sensitive)  # query results for one 'queries'
             files = set()
             # add files from each query to a set
             for query_request in results.keys():
