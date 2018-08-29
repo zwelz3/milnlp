@@ -17,6 +17,7 @@ class SingleDocSummarizer(object):
         self.summarizer.stop_words = get_stop_words(LANGUAGE)
         self.token = tokenizer(LANGUAGE)
         #
+        self.document = None
         self.summary = None
         self.words = None
 
@@ -43,11 +44,11 @@ class SingleDocSummarizer(object):
             document_text = processing_func(document_text)
 
         # Parse data into sumy document object
-        document = create_sumy_dom(document_text, self.token)
+        self.document = create_sumy_dom(document_text, self.token)
 
         # Create summary for document
-        self.summary = self.summarizer(document, 5)
+        self.summary = self.summarizer(self.document, 5)
 
         # Phrase extraction using naive unicode candidates and TextRank
-        doc_text = ' '.join([sentence._text for sentence in document.sentences])  # text only protected/private access
+        doc_text = ' '.join([sentence._text for sentence in self.document.sentences])  # protected/private access
         self.words = dict(score_keyphrases_by_textrank(doc_text, n_keywords=0.15))  # results are (candidate, score)
