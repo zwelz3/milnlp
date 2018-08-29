@@ -8,12 +8,12 @@ from itertools import chain
 from .topic_model import Query
 from .metadoc import create_all_metadocs, build_supermetadocs
 #
-from ..converters.text_utils import process_lines, remove_short_lines, merge_likely_sentences
-from ..converters.text_utils import split_likely_sentences, remove_unlikely_sentences, remove_nonascii
+from ..converters.text_utils import RawTextProcessing
+from ..converters.pdf_to_text import create_sumy_dom
+from ..parsers.pdf import pdf_parser
 from ..mining.phrases import score_keyphrases_by_textrank
-from ..converters.pdf_to_text import create_text, create_sumy_dom
 #
-from sumy.models.dom import Paragraph, ObjectDocumentModel
+from sumy.models.dom import ObjectDocumentModel
 
 
 def get_items(path, flist, dlist, lvl=0):
@@ -63,27 +63,18 @@ def parse_collection(flist, summarizer, token, keep_file=True):
             print(f'Parsing {f_ind+1}/{len(flist)}: ', filepath)
             if f_extension == 'pdf':
                 # print(' -- PDFs are converted to text prior to parsing in order to retain formatting.')
-                # Create text data
-                document_text = create_text(filepath, token, to_file=False)
-                if document_text == 1:  # corrupt file error code
-                    continue  # skip to next file
-                if document_text == 2:  # empty/optical file error code
-                    continue  # skip to next file
-                # Write to file to save time later
-                if keep_file:
-                    with open(filepath[:-4] + '.txt', 'wb') as txt_file:
-                        # raw_text = remove_nonascii([document_text])
-                        txt_file.write(document_text.encode('utf-8'))
-                    flag = subprocess.check_call(["attrib", "+H", filepath[:-4] + '.txt'])
+                status, document_text = pdf_parser(filepath, token, keep_file=keep_file)
+                if status != 0 or document_text is None:
+                    continue
+
                 # Pre-process
-                lines = process_lines(document_text)
-                lines = remove_short_lines(lines)
-                lines = merge_likely_sentences(lines)
-                lines = split_likely_sentences(lines)
-                lines = remove_unlikely_sentences(lines)
-                lines = remove_nonascii(lines)
+                for attr in RawTextProcessing.order:
+                    # Uses the order of RawTextProcessing to apply functions to process into document text
+                    processing_func = getattr(RawTextProcessing, attr)
+                    document_text = processing_func(document_text)
+
                 # Parse data into document
-                document = create_sumy_dom(lines, token)
+                document = create_sumy_dom(document_text, token)
                 # Create naive summary for metadata document
                 metasummary = '\n'.join(
                     [str(sentence) for sentence in summarizer(document, 10)])  # should return n sentences if n < 10
@@ -92,9 +83,9 @@ def parse_collection(flist, summarizer, token, keep_file=True):
                 doc_text = ' '.join([sentence._text for sentence in document.sentences])
                 metawords = dict(score_keyphrases_by_textrank(doc_text,
                                                               n_keywords=0.95))  # if n < 1 it returns the percentage of results
-
                 # these restults are now (candidate, PageRank score) format not (word, counts)
                 # print("\nWords for metadata document: \n", metawords)
+
                 # Write results to metadata document
                 mdoc_name = '.'.join(filepath.split('\\')[-1].split('.')[:-1])+'.mdoc'
                 mdoc_path = '\\'.join([os.path.dirname(filepath), mdoc_name])
@@ -144,15 +135,15 @@ def reparser(docs, token, method='full'):
             print(f" - Reading in file {f_ind+1}/{len(docs)}")
             with open(docpath, 'rb') as txt_file:
                 document_text = txt_file.read().decode('utf-8')
+
             # Pre-process
-            lines = process_lines(document_text)
-            lines = remove_short_lines(lines)
-            lines = merge_likely_sentences(lines)
-            lines = split_likely_sentences(lines)
-            lines = remove_unlikely_sentences(lines)
-            lines = remove_nonascii(lines)
+            for attr in RawTextProcessing.order:
+                # Uses the order of RawTextProcessing to apply functions to process into document text
+                processing_func = getattr(RawTextProcessing, attr)
+                document_text = processing_func(document_text)
+
             # Parse data into document
-            document = create_sumy_dom(lines, token)
+            document = create_sumy_dom(document_text, token)
             parsed_docs[docpath] = DummyParser(document)
     elif method == 'reduced':
         assert type(docs) is dict, f"Docs of type '{type(docs)}' not valid for '{method}' method."
@@ -178,15 +169,15 @@ def reparser(docs, token, method='full'):
                 starting_pos = page_break + 1  # don't want to include the page break so add 1
             document_text = '\f'.join(page_text)
             f_ind += 1
+
             # Pre-process
-            lines = process_lines(document_text)
-            lines = remove_short_lines(lines)
-            lines = merge_likely_sentences(lines)
-            lines = split_likely_sentences(lines)
-            lines = remove_unlikely_sentences(lines)
-            lines = remove_nonascii(lines)
+            for attr in RawTextProcessing.order:
+                # Uses the order of RawTextProcessing to apply functions to process into document text
+                processing_func = getattr(RawTextProcessing, attr)
+                document_text = processing_func(document_text)
+
             # Parse data into document
-            document = create_sumy_dom(lines, token)
+            document = create_sumy_dom(document_text, token)
             parsed_docs[docpath] = DummyParser(document)
     else:
         raise TypeError("The method specified is not valid.")
@@ -205,7 +196,7 @@ def create_superdoc(parsed_docs):
 
 
 class Collection(object):
-    """"""
+    """Collection object for processing abstract directories of documents."""
     supported_exts = {'pdf', 'html', 'txt'}
 
     def __init__(self, collection_path):
