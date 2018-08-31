@@ -9,7 +9,7 @@ class Query(object):
     def __init__(self, flist):
         self.files = flist
 
-    def union_query(self, query_list, case_sensitive=False, buffer=0):
+    def union_query(self, query_list, case_sensitive=False):
         """Takes a query list and list of .txt file paths and returns matching files and their page numbers.
            Note, the check is case insensitive.
            Note, if a query has a single item, the tuple must be created correctly ('item_one',) <- notice the comma.
@@ -60,7 +60,7 @@ class Query(object):
 
         return query_results
 
-    def intersect_query(self, query_set, case_sensitive=False, buffer=0):
+    def intersect_query(self, query_set, case_sensitive=False):
         """Takes a list of query_lists (for union) and finds the intersection.
            Uses the regex_query as a baseline search, therefore the following behavior should be expected:
              - tuples within a list of queries are unionized

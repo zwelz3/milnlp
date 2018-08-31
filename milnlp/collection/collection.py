@@ -8,7 +8,7 @@ from itertools import chain
 from .topic_model import Query
 from .metadoc import create_all_metadocs, build_supermetadocs
 #
-from ..converters.text_utils import RawTextProcessing
+from ..converters.text_utils import process_raw_into_lines
 from ..converters.pdf_to_text import create_sumy_dom
 from ..parsers.pdf import pdf_parser
 from ..mining.phrases import score_keyphrases_by_textrank
@@ -68,10 +68,7 @@ def parse_collection(flist, summarizer, token, keep_file=True):
                     continue
 
                 # Pre-process
-                for attr in RawTextProcessing.order:
-                    # Uses the order of RawTextProcessing to apply functions to process into document text
-                    processing_func = getattr(RawTextProcessing, attr)
-                    document_text = processing_func(document_text)
+                document_text = process_raw_into_lines(document_text)
 
                 # Parse data into document
                 document = create_sumy_dom(document_text, token)
@@ -113,15 +110,17 @@ def parse_collection(flist, summarizer, token, keep_file=True):
                     print(f"Metadata file updated.")
 
 
-def reparser(docs, token, method='full'):
+def reparser(docs, token, method='full', buffer_size=0):
     """
 
     :param docs: either a list(doc_path) for method=='full' or
                  a dict(key=doc_path, value=set(page#)) for method=='reduced'
     :param token: tokenizer object
     :param method: 'full' uses all pages from a constituent document, 'reduced' uses only pages where query appeared
+    :param buffer_size: TODO
     :return:
     """
+
     class DummyParser(object):
         """"""
         def __init__(self, document):
@@ -137,14 +136,12 @@ def reparser(docs, token, method='full'):
                 document_text = txt_file.read().decode('utf-8')
 
             # Pre-process
-            for attr in RawTextProcessing.order:
-                # Uses the order of RawTextProcessing to apply functions to process into document text
-                processing_func = getattr(RawTextProcessing, attr)
-                document_text = processing_func(document_text)
+            document_text = process_raw_into_lines(document_text)
 
             # Parse data into document
             document = create_sumy_dom(document_text, token)
             parsed_docs[docpath] = DummyParser(document)
+
     elif method == 'reduced':
         assert type(docs) is dict, f"Docs of type '{type(docs)}' not valid for '{method}' method."
         f_ind = 0
@@ -162,19 +159,35 @@ def reparser(docs, token, method='full'):
             matches = pattern.finditer(raw_document_text)  # each match is a page
             page_text = []
             starting_pos = 0
-            for ii, match in enumerate(matches):  # ii is page number (0 index):
+            for ii, match in enumerate(matches):
+                page_num = ii + 1  # convenience variable for readability
                 page_break = match.span()[0]
-                if ii + 1 in pages:
+                if page_num in pages:
                     page_text.append(raw_document_text[starting_pos:page_break])
+                else:
+                    if buffer_size:  # True if != 0
+                        if page_num - 1 in pages or page_num + 1 in pages:
+                            # get raw page text
+                            single_page_raw = raw_document_text[starting_pos:page_break]
+                            # Convert to sentences
+                            sentences = process_raw_into_lines(single_page_raw)
+
+                        if page_num - 1 in pages:  # previous page was in pages
+                            # Add buffer to page text using material from beginning of page
+                            page_text.append(' '.join(
+                                sentences[0:buffer_size]) + '\n')  # truncated if buffer_size > #sentences available
+
+                        if page_num + 1 in pages:  # next page is in pages
+                            # Add buffer to page text using material from end of page
+                            page_text.append(' '.join(sentences[len(sentences) - buffer_size:len(
+                                sentences)]) + '\n')  # truncated if buffer_size > #sentences available
+
                 starting_pos = page_break + 1  # don't want to include the page break so add 1
             document_text = '\f'.join(page_text)
             f_ind += 1
 
             # Pre-process
-            for attr in RawTextProcessing.order:
-                # Uses the order of RawTextProcessing to apply functions to process into document text
-                processing_func = getattr(RawTextProcessing, attr)
-                document_text = processing_func(document_text)
+            document_text = process_raw_into_lines(document_text)
 
             # Parse data into document
             document = create_sumy_dom(document_text, token)
@@ -269,15 +282,28 @@ class Collection(object):
         print("Done!")
         return query_results, qmethod
 
-    def create_composite_document(self, query, token, method='reduced'):
-        """methods = reduced and full"""
+    def create_composite_document(self, query, token, method='reduced', buffer_size=0):
+        """methods = reduced and full
+           buffer_size = number of sentences to add from previous and next page to document"""
+        if not query:
+            print("Sub-collection: ", self.path)
+            print("Creating a composite document using all files in sub-collection...")
+            docs = list(set([file[:-4]+'.txt' if self.path in file else None for file in self.flist]))
+            # parse and compile into composite
+            parsed_docs = reparser(docs, token, method='full')
+            composite_doc_paragraphs = []
+            for d_parser in parsed_docs.values():
+                composite_doc_paragraphs.extend(d_parser.document.paragraphs)
+            print("Done!")
+            return ObjectDocumentModel(composite_doc_paragraphs)
+
         query_results, qmethod = self.make_query(query)
         assert query_results, "The collection does not contain results for the specified query. "
         if method == 'full':
             print("Creating a composite document using the full constituent documents...")
             if qmethod == 'union':
-                docs = list(
-                    chain.from_iterable([list(query_results[key].keys()) for key in query_results.keys()]))
+                docs = list(set(
+                    chain.from_iterable([list(query_results[key].keys()) for key in query_results.keys()])))
             elif qmethod == 'intersect':
                 docs = list(query_results.keys())
             parsed_docs = reparser(docs, token, method=method)
@@ -289,6 +315,7 @@ class Collection(object):
 
         elif method == 'reduced':
             print("Creating a composite document using only the relevant pages from constituent documents...")
+            print("Applying a sentence buffer of size", buffer_size) if buffer_size else None
             if qmethod == 'union':
                 merged_union_dict = dict()
                 for union_phrase in query_results.keys():
@@ -298,7 +325,7 @@ class Collection(object):
                         elif pages:
                             merged_union_dict[doc].update(pages)
                 query_results = merged_union_dict
-            parsed_docs = reparser(query_results, token, method=method)
+            parsed_docs = reparser(query_results, token, method=method, buffer_size=buffer_size)
             composite_doc_paragraphs = []
             for d_parser in parsed_docs.values():
                 composite_doc_paragraphs.extend(d_parser.document.paragraphs)

@@ -1,12 +1,24 @@
 import re
 
 
+def process_raw_into_lines(text):
+    """Uses the RawTextProcessing class to process text"""
+    for attr in RawTextProcessing.order:
+        # Uses the order of RawTextProcessing to apply functions to process into document text
+        processing_func = getattr(RawTextProcessing, attr)
+        text = processing_func(text)
+    return text
+
+
 class RawTextProcessing(object):
-    """Simple collection of attributes that should be used to pre-process raw text into a document string."""
+    """Simple collection of attributes that should be used to pre-process raw text into a document string.
+    TODO replace with waaaay more efficient process"""
+
     order = ['process_lines',
-             'remove_short_lines',
-             'merge_likely_sentences',
              'split_likely_sentences',
+             'merge_likely_sentences',
+             'remove_weblinks',
+             'remove_short_lines',
              'remove_unlikely_sentences',
              'remove_nonascii']
 
@@ -23,11 +35,85 @@ class RawTextProcessing(object):
                 if init_pos != end_pos:
                     # print(init_pos, end_pos)
                     lines.append(text[init_pos:end_pos])
-                init_pos = end_pos+1
+                init_pos = end_pos + 1
         return lines
 
     @staticmethod
-    def remove_short_lines(text, min_chars=5):
+    def split_likely_sentences(text):
+        """Split up lines that appear to be separate sentences"""
+        individualized_lines = []
+        for line in text:
+            split_line = [part for part in line.split('. ') if part]
+            if len(split_line) == 1:
+                individualized_lines.append(line)
+            else:
+                # add each split sentence
+                for ii, part in enumerate(split_line):
+                    if ii < len(split_line) - 1:
+                        individualized_lines.append(part + '.')
+                    else:
+                        to_append = part + '.' if line[-1] == '.' else part
+                        individualized_lines.append(to_append)
+        return individualized_lines
+
+    @staticmethod
+    def merge_likely_sentences(text):
+        # Merge lines if they don't end in .?!:
+        # todo find better way to handle cases like "U.S."
+        merged_lines = []
+        prev_line = None
+        for line in text:
+            # handle sentences with spaces or end in quotes
+            if line[-1] == ' ' and len(line) > 2:
+                if line[-2] in '"”':
+                    line_ind = -3
+                else:
+                    line_ind = -2
+            elif line[-1] in '"”' and len(line) > 1:
+                line_ind = -2
+            else:
+                line_ind = -1
+
+            # Check line for merging
+            if prev_line is None:
+                if line[line_ind] in '.?!:' and line[line_ind - 3:line_ind].lower() != "u.s":
+                    merged_lines.append(line)
+                else:
+                    prev_line = line
+            else:  # there is a previous line
+                if line.lower().endswith("u.s."):
+                    line = line + ' '
+                line = ''.join([prev_line, line])
+                if line[line_ind] in '.?!:' and line[line_ind - 3:line_ind].lower() != "u.s":
+                    merged_lines.append(line)
+                    prev_line = None
+                else:
+                    prev_line = line
+        return merged_lines
+
+    @staticmethod
+    def remove_weblinks(text):
+        """Takes a list of lines and removes any web urls from the text"""
+        web_filter = r"(http[\S]+|www\.[\S]+)"
+        pattern = re.compile(web_filter)
+
+        lines = []
+        for line in text:
+            matches = pattern.finditer(line)
+            to_replace = dict()
+            for match in matches:
+                before = line[match.span()[0]:match.span()[1]]
+                # replace match location with '' unless match[-1]=='.' then replace with '.'
+                after = '' if before[-1] != '.' else '.'
+                to_replace[before] = after
+
+            for key, value in to_replace.items():
+                line = line.replace(key, value)
+            lines.append(line)
+        return lines
+
+    @staticmethod
+    def remove_short_lines(text, min_chars=20):
         """Takes a list of lines and removes short ones"""
         lines_to_delete = []
         for line_idx, line in enumerate(text):
@@ -41,64 +127,7 @@ class RawTextProcessing(object):
         return text
 
     @staticmethod
-    def merge_likely_sentences(text):
-        from nltk.corpus import stopwords
-        continuation_words = set(stopwords.words('english'))
-
-        # Merge lines if they dont end in .?!: AND if the next line first char is a number or uncapitalized.
-        merged_lines = []
-        prev_line = None
-        for line in text:
-            if prev_line is None:
-                if line[-1] in ".?!:":
-                    merged_lines.append(line)
-                else:
-                    prev_line = line
-            else:  # there is a previous line
-                if prev_line[-1] not in ".?!:" and line[0].upper()==line[0] and prev_line.split(' ')[-1] in continuation_words:
-                    line = ' '.join([prev_line, line])
-                    if line[-1] in ".?!:":
-                        merged_lines.append(line)
-                        prev_line = None
-                    else:
-                        prev_line = line
-                elif prev_line[-1] not in ".?!:" and line[0].upper()==line[0]:
-                    # New sentence started on line
-                    merged_lines.append(prev_line)
-                    prev_line = None
-                    if line[-1] in ".?!:":
-                        merged_lines.append(line)
-                    else:
-                        prev_line = line
-                else:
-                    line = ' '.join([prev_line, line])
-                    if line[-1] in ".?!:":
-                        merged_lines.append(line)
-                        prev_line = None
-                    else:
-                        prev_line = line
-        return merged_lines
-
-    @staticmethod
-    def split_likely_sentences(text):
-        """Split up lines that appear to be separate sentences"""
-        individualized_lines = []
-        for line in text:
-            split_line = [part for part in line.split('. ') if part]
-            if len(split_line)==1:
-                individualized_lines.append(line)
-            else:
-                # add each split sentence
-                for ii, part in enumerate(split_line):
-                    if ii<len(split_line)-1:
-                        individualized_lines.append(part+'.')
-                    else:
-                        to_append = part+'.' if line[-1]=='.' else part
-                        individualized_lines.append(to_append)
-        return individualized_lines
-
-    @staticmethod
-    def remove_unlikely_sentences(text, min_chars=10, min_words=4):
+    def remove_unlikely_sentences(text, min_chars=10, min_words=6):
         """Removes lines with less than the number of chars or words"""
         lines_to_delete = []
         for line_idx, line in enumerate(text):

@@ -77,5 +77,7 @@ def create_sumy_dom(text, tokenizer):
             paragraph = []  # start new paragraph going forward
         # Process current line
         paragraph.append(Sentence(line, tokenizer))
+        if ii + 1 == len(text):  # if last line just dump
+            paragraphs.append(Paragraph(paragraph))
 
     return ObjectDocumentModel(tuple(paragraphs))
