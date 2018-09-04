@@ -1,108 +1,124 @@
 import re
+#
+from milnlp.regex.utils import regex_plurals, regex_constituents, regex_delims, regex_whole_word
 
 
-class Query(object):
-    """Query object containing functionality for searching a collection of files.
+class AbstractQuery(object):
+    def __init__(self):
+        self.UUID = None  # ID
+        self.type = None  # simple/complex
+        self.processed = False  # bool if already processed
+        self.match = None  # query matches
 
-    flist: List of text files to be searched. This is often generated with the collection object.
-    """
-    def __init__(self, flist):
-        self.files = flist
 
-    def union_query(self, query_list, case_sensitive=False):
-        """Takes a query list and list of .txt file paths and returns matching files and their page numbers.
-           Note, the check is case insensitive.
-           Note, if a query has a single item, the tuple must be created correctly ('item_one',) <- notice the comma.
+class SimpleQuery(AbstractQuery):
+    UUID_INDEX = 1
 
-           query_list: list of tuples with permutations of the same query term
-                       i.e. [('F35', 'F-35', 'F 35'), ('ALR-69A', 'ALR69A', '69A')]
+    def __init__(self, phrase):
+        super().__init__()
+        #
+        self.type = 'simple'
+        self.regex = None
+        self.flags = {
+            'case-sensitive': False,
+            'whole-word': False,
+            'special-delims': False,
+            'plurals': False,
+            'constituents': False,
+        }
+        #
+        self.phrase = phrase
+        self.__set_uuid()
 
-           file_list: list of full filepaths
-        """
-        # todo check to make sure every query is a tuple
-        query_results = dict()
-        for query in query_list:
-            query_results[', '.join([element for element in query])] = dict()
+    def __set_uuid(self):
+        """Creates a uuid using the class attribute"""
+        inst_uuid = "SQ_" + str(SimpleQuery.UUID_INDEX).zfill(3)
+        SimpleQuery.UUID_INDEX += 1
+        self.UUID = inst_uuid
 
-        for file in self.files:
+    def build_regex(self):
+        """Uses the instance phrase and flags to build a RegEx string"""
+        regex_phrase = self.phrase
+        for flag, setting in self.flags.items():
+            # Use if sequence to enforce order regex_phrase is constructed
+            if flag == "plurals" and setting:
+                regex_phrase = regex_plurals(regex_phrase)
+            if flag == "constituents" and setting:
+                regex_phrase = regex_constituents(regex_phrase)
+            if flag == "special-delims" and setting:
+                regex_phrase = regex_delims(regex_phrase)
+            if flag == "whole-word" and setting:
+                regex_phrase = regex_whole_word(regex_phrase)
+            # NOTE: case-sensitive flag is applied directly to compiled pattern
+        self.regex = regex_phrase
+
+    def update_flags(self, flag_dict):
+        """Updates the instance flag dictionary"""
+        assert self.flags.keys() == flag_dict.keys(), "Dictionary must contain same keys as instance."
+        self.processed = False  # if previously processed, set to False since instance has been changed
+        self.match = None  # if previously processed, set to None since instance has been changed
+        for key, new_value in flag_dict.items():
+            self.flags[key] = new_value
+        # call RegEx builder method
+        self.build_regex()
+
+    def update_phrase(self, phrase):
+        """Updates the query phrase, but retains the existing UUID (useful for tweaking low level queries)"""
+        self.processed = False  # if previously processed, set to False since instance has been changed
+        self.match = None       # if previously processed, set to None since instance has been changed
+        self.phrase = phrase
+        self.build_regex()
+
+    def apply_query(self, file_set):
+        """Run the simple query and collect results into dictionary"""
+        assert type(file_set) is set, "ERROR: file_set must be of type <class 'set'>"
+
+        for file in file_set:
             if file.endswith('.txt'):
-                # print("\nAnalyzing file: ", file)
+                print("\nAnalyzing file: ", file)
 
                 # Open and read as text
                 with open(file, 'rb') as doc:
                     text = doc.read()
                 text = text.decode("utf-8")
 
-                # Get pages from pdf2txt
+                # Step 1, get bounds of each page
+                page_list = []
+                starting_pos = 0
                 pattern = re.compile(r"\f")  # page indicator from pdf2txt
                 matches = pattern.finditer(text)  # each match is a page
-                starting_pos = 0
                 for ii, match in enumerate(matches):  # ii is page number (0 index)
-                    # print(" -> Analyzing page: ", ii+1)
                     page_break = match.span()[0]
-                    # print(f"Page break #{ii+1} at char '{page_break}'")
-                    # print(f" -> range {starting_pos} to {page_break}")
-                    page_text = text[starting_pos:page_break]
+                    page_list.append((starting_pos, page_break))
                     starting_pos = page_break + 1  # dont want to include the page break so add 1
 
-                    for query in query_list:
-                        result_key = ', '.join([element for element in query])  # used for dict
-                        re_pattern = '|'.join([term for term in query])
-                        if case_sensitive:
-                            re_filter = re.compile(re_pattern)
-                        else:
-                            re_filter = re.compile(re_pattern, re.IGNORECASE)
-                        if re_filter.findall(page_text):
-                            # print("  -->  Found at least 1 match for pattern: ", re_pattern)
-                            if file not in query_results[result_key]:
-                                query_results[result_key][file] = set()
-                            query_results[result_key][file].update({ii + 1})  # todo also add buffer pages
+                # Step 2, get every occurance of the RegEx pattern in the text
+                match_set = set()
+                if not self.flags["case-sensitive"]:
+                    pattern = re.compile(self.regex, re.IGNORECASE)  # RegEx pattern
+                else:
+                    pattern = re.compile(self.regex)  # RegEx pattern
+                matches = pattern.finditer(text)
+                for match in matches:
+                    occurance = match.span()[0]
+                    match_set.add(occurance)
 
-        return query_results
+                # Step 3, resolve the match_list with the page_list to get the occurance in the current document
+                pages = set()
+                for page_num, page_limits in enumerate(page_list):
+                    for match_loc in set(match_set):
+                        if page_limits[0] <= match_loc <= page_limits[1]:
+                            pages.add(page_num)
+                            match_set.remove(match_loc)
+                if pages:
+                    print("-> Matches found on pages: ", pages)
 
-    def intersect_query(self, query_set, case_sensitive=False):
-        """Takes a list of query_lists (for union) and finds the intersection.
-           Uses the regex_query as a baseline search, therefore the following behavior should be expected:
-             - tuples within a list of queries are unionized
-                   **Note: this makes tuple lists and tuple contents equivalent [[('a',),('b',)]] == [[('a','b')]]
-             - tuples across the query set (list of lists) are intersected
-        """
-        assert len(query_set) > 1, "Cannot compute intersection of a single query"''
-        # todo check to make sure every query is a tuple
-        for ii, queries in enumerate(query_set):
-            results = self.union_query(queries, case_sensitive=case_sensitive)  # query results for one 'queries'
-            files = set()
-            # add files from each query to a set
-            for query_request in results.keys():
-                files.update(results[query_request].keys())
+                # Checkpoint, make sure each match was assigned a page
+                assert not match_set, "WARNING: Not all matched were assigned a page."
 
-            # This produces the file and pages that each and every query portion of
-            # an individual in the query set are found at
-            query_fp_dict = {}
-            for file in files:
-                for fp_dict in results.values():  # file: page dictionary
-                    if file in fp_dict:  # file the current file is in the query dictionary
-                        pages = fp_dict[file]
-                        if file not in query_fp_dict:
-                            query_fp_dict[file] = pages
-                        else:
-                            query_fp_dict[file].update(pages)
-
-            # Note that query_fp_dict is using union, therefore it must now be cast to
-            # the final dictionary that will find intersection
-            # todo add buffer handle
-            if ii > 0:
-                intersected = {}
-                shared_files = set(p_query_fp_dict.keys()).intersection(set(query_fp_dict.keys()))
-                for file in shared_files:
-                    shared_pages = p_query_fp_dict[file].intersection(query_fp_dict[file])
-                    # print(p_query_fp_dict[file],query_fp_dict[file])
-                    # print(file.split('\\')[-1])
-                    # print("Shared pages: ",shared_pages)
-                    intersected[file] = shared_pages
-            else:
-                intersected = query_fp_dict
-            print(f"Number of files matching all queries up to and including query #{ii+1}:  {len(intersected)}")
-            p_query_fp_dict = query_fp_dict
-
-        return intersected
+                # Step 4, add to dictionary of matches
+                if not self.match and pages:
+                    self.match = {file: sorted(list(pages))}
+                elif pages:
+                    self.match[file] = sorted(list(pages))
+        self.processed = True

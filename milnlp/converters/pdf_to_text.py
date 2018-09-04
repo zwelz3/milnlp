@@ -55,6 +55,7 @@ def create_text(filepath, tokenizer, to_file=True, **kwargs):
         page_words = [len(tokenizer.to_words(page)) for page in payload.split('\f')]
         if max(page_words) < 100:
             print("WARNING: Document is likely corrupt or not a machine-readable PDF file. Skipping...")
+            # TODO this gets triggered when to_file=True because the payload returned is the file path
             return 2
         if to_file:
             flag = subprocess.check_call(["attrib", "+H", filepath[:-4]+'.txt'])

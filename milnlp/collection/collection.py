@@ -5,7 +5,7 @@ import subprocess
 #
 from itertools import chain
 #
-from .topic_model import Query
+# from .topic_model import Query # todo replace with new query
 from .metadoc import create_all_metadocs, build_supermetadocs
 #
 from ..converters.text_utils import process_raw_into_lines
