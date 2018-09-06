@@ -62,7 +62,7 @@ def regex_delims(phrase):
     if ' ' in phrase or '-' in phrase:
         # multiple words in phrase
         portions = list(chain.from_iterable([constituent.split('-') for constituent in phrase.split(' ')]))
-        return '[\s-,]'.join(portions)
+        return '[\s,-]'.join(portions)  # todo check we may want ([\s-]|, ) to capture 'comma-space'
     else:
         # one word in phrase
         # print("INFO: 'special-delims' flag was selected, but the supplied phrase only has one word.")  # todo logging
