@@ -134,7 +134,7 @@ class SimpleQuery(AbstractQuery):
 class ComplexQuery(AbstractQuery):
     UUID_INDEX = 1
 
-    def __init__(self, shelf_path, key_list, operator):
+    def __init__(self, key_list, operator, shelf_path=None, object_list=None):
         super().__init__()
         #
         self.type = 'complex'
@@ -143,6 +143,9 @@ class ComplexQuery(AbstractQuery):
         self.regex = None
         self.operator = operator.lower()  # union or intersection
         self.shelf_path = shelf_path
+        self.object_list = object_list
+        #
+        assert any([shelf_path, object_list]), "ERROR: Either a path to or the list of objects must be supplied."
         #
         self.__set_uuid()
         self.__set_phrase(key_list)
@@ -165,6 +168,9 @@ class ComplexQuery(AbstractQuery):
 
     def __load_objects(self, keys):
         """Load the specified dependencies from the shelf files"""
+        if self.object_list:  # if user supplied the objects, do not load from file
+            return self.object_list
+
         # assert path.exists(shelf_path), "ERROR: the specified path does not exist."   # todo, get working
         items = []
         with shelve.open(self.shelf_path, 'r') as shelf:
