@@ -5,8 +5,8 @@ import subprocess
 #
 from itertools import chain
 #
-# from .topic_model import Query # todo replace with new query
 from .metadoc import create_all_metadocs, build_supermetadocs
+from .topic_model import SimpleQuery, ComplexQuery
 #
 from ..converters.text_utils import process_raw_into_lines
 from ..converters.pdf_to_text import create_sumy_dom
@@ -151,7 +151,7 @@ def reparser(docs, token, method='full', buffer_size=0):
                 print(f"  -> No matching pages. Skipping...")
                 f_ind += 1
                 continue
-            print(f"  -> Matching pages: {pages}")
+            print(f"  -> Matching pages: {[page+ 1 for page in pages]}")
             with open(docpath, 'rb') as txt_file:
                 raw_document_text = txt_file.read().decode('utf-8')
             # Get pages from pdf2txt
@@ -160,24 +160,23 @@ def reparser(docs, token, method='full', buffer_size=0):
             page_text = []
             starting_pos = 0
             for ii, match in enumerate(matches):
-                page_num = ii + 1  # convenience variable for readability
                 page_break = match.span()[0]
-                if page_num in pages:
+                if ii in pages:
                     page_text.append(raw_document_text[starting_pos:page_break])
                 else:
                     if buffer_size:  # True if != 0
-                        if page_num - 1 in pages or page_num + 1 in pages:
+                        if ii - 1 in pages or ii + 1 in pages:
                             # get raw page text
                             single_page_raw = raw_document_text[starting_pos:page_break]
                             # Convert to sentences
                             sentences = process_raw_into_lines(single_page_raw)
 
-                        if page_num - 1 in pages:  # previous page was in pages
+                        if ii - 1 in pages:  # previous page was in pages
                             # Add buffer to page text using material from beginning of page
                             page_text.append(' '.join(
                                 sentences[0:buffer_size]) + '\n')  # truncated if buffer_size > #sentences available
 
-                        if page_num + 1 in pages:  # next page is in pages
+                        if ii + 1 in pages:  # next page is in pages
                             # Add buffer to page text using material from end of page
                             page_text.append(' '.join(sentences[len(sentences) - buffer_size:len(
                                 sentences)]) + '\n')  # truncated if buffer_size > #sentences available
@@ -186,7 +185,6 @@ def reparser(docs, token, method='full', buffer_size=0):
             document_text = '\f'.join(page_text)
             f_ind += 1
 
-            # Pre-process
             document_text = process_raw_into_lines(document_text)
 
             # Parse data into document
@@ -257,55 +255,22 @@ class Collection(object):
         parse_collection(self.flist_unprocessed, summarizer, token, term_frequency_threshold)
         build_supermetadocs(self.dlist)
 
-    def build_query(self):
-        """Uses the raw file list to instantiate a Query object"""
-        return Query(self.flist)
+    def create_composite_doc_from_query_object(self, query_object, token, method='reduced', buffer_size=0):
+        """Creates a composite document using the query objects from the GUI query builder tool."""
+        # Check object type
+        assert type(query_object) in {SimpleQuery, ComplexQuery}, \
+            "ERROR: function only supports processing on SimpleQuery and ComplexQuery objects."
+        # Check if query is already applied
+        if not query_object.processed:
+            print("Applying query...")
+            query_object.apply_query(self.flist)
+        # Check to make sure data exists (neither of these should ever trigger.)
+        assert query_object.match, "ERROR: The query was not applied successfully."
+        assert any(query_object.match.values()), "ERROR: The query did not return any matches in the collection."
 
-    def make_query(self, query, case_sensitive=False):
-        """Runs the query on the collection"""
-        # Build query object
-        qobj = self.build_query()
-        # Make query
-        assert type(query) is list, "Query input must be a list"
-        if type(query[0]) is tuple:
-            qmethod = 'union'
-            phrase = f"Performing {qmethod} query..."
-            print(phrase)
-            query_results = qobj.union_query(query, case_sensitive=case_sensitive)
-        elif type(query[0]) is list and type(query[0][0]) is tuple:
-            qmethod = 'intersect'
-            phrase = f"Performing {qmethod} query..."
-            print(phrase)
-            query_results = qobj.intersect_query(query, case_sensitive=case_sensitive)
-        else:
-            raise TypeError('Format of query is not list of tuples (union) or list of lists of tuples (intersection')
-        print("Done!")
-        return query_results, qmethod
-
-    def create_composite_document(self, query, token, method='reduced', buffer_size=0):
-        """methods = reduced and full
-           buffer_size = number of sentences to add from previous and next page to document"""
-        if not query:
-            print("Sub-collection: ", self.path)
-            print("Creating a composite document using all files in sub-collection...")
-            docs = list(set([file[:-4]+'.txt' if self.path in file else None for file in self.flist]))
-            # parse and compile into composite
-            parsed_docs = reparser(docs, token, method='full')
-            composite_doc_paragraphs = []
-            for d_parser in parsed_docs.values():
-                composite_doc_paragraphs.extend(d_parser.document.paragraphs)
-            print("Done!")
-            return ObjectDocumentModel(composite_doc_paragraphs)
-
-        query_results, qmethod = self.make_query(query)
-        assert query_results, "The collection does not contain results for the specified query. "
         if method == 'full':
             print("Creating a composite document using the full constituent documents...")
-            if qmethod == 'union':
-                docs = list(set(
-                    chain.from_iterable([list(query_results[key].keys()) for key in query_results.keys()])))
-            elif qmethod == 'intersect':
-                docs = list(query_results.keys())
+            docs = list(query_object.match.keys())
             parsed_docs = reparser(docs, token, method=method)
             composite_doc_paragraphs = []
             for d_parser in parsed_docs.values():
@@ -316,16 +281,7 @@ class Collection(object):
         elif method == 'reduced':
             print("Creating a composite document using only the relevant pages from constituent documents...")
             print("Applying a sentence buffer of size", buffer_size) if buffer_size else None
-            if qmethod == 'union':
-                merged_union_dict = dict()
-                for union_phrase in query_results.keys():
-                    for doc, pages in query_results[union_phrase].items():
-                        if doc not in merged_union_dict:
-                            merged_union_dict[doc] = pages
-                        elif pages:
-                            merged_union_dict[doc].update(pages)
-                query_results = merged_union_dict
-            parsed_docs = reparser(query_results, token, method=method, buffer_size=buffer_size)
+            parsed_docs = reparser(query_object.match, token, method=method, buffer_size=buffer_size)
             composite_doc_paragraphs = []
             for d_parser in parsed_docs.values():
                 composite_doc_paragraphs.extend(d_parser.document.paragraphs)

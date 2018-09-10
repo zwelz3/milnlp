@@ -169,7 +169,12 @@ class ComplexQuery(AbstractQuery):
     def __load_objects(self, keys):
         """Load the specified dependencies from the shelf files"""
         if self.object_list:  # if user supplied the objects, do not load from file
-            return self.object_list
+            items = []
+            object_dict = dict([(query.UUID, query) for query in self.object_list])
+            for key in keys:
+                assert key in object_dict.keys(), "ERROR: one or more of the keys specified is not on the shelf."
+                items.append(object_dict[key])
+            return items
 
         # assert path.exists(shelf_path), "ERROR: the specified path does not exist."   # todo, get working
         items = []
