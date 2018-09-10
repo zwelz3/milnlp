@@ -7,6 +7,7 @@ from itertools import chain
 #
 from .metadoc import create_all_metadocs, build_supermetadocs
 from .topic_model import SimpleQuery, ComplexQuery
+from .legacy_query import Query
 #
 from ..converters.text_utils import process_raw_into_lines
 from ..converters.pdf_to_text import create_sumy_dom
@@ -282,6 +283,84 @@ class Collection(object):
             print("Creating a composite document using only the relevant pages from constituent documents...")
             print("Applying a sentence buffer of size", buffer_size) if buffer_size else None
             parsed_docs = reparser(query_object.match, token, method=method, buffer_size=buffer_size)
+            composite_doc_paragraphs = []
+            for d_parser in parsed_docs.values():
+                composite_doc_paragraphs.extend(d_parser.document.paragraphs)
+            print("Done!")
+            return ObjectDocumentModel(composite_doc_paragraphs)
+
+    def build_query(self):
+        """DEPRECATED
+        Uses the raw file list to instantiate a Query object"""
+        return Query(self.flist)
+
+    def make_query(self, query, case_sensitive=False):
+        """DEPRECATED
+        Runs the query on the collection"""
+        # Build query object
+        qobj = self.build_query()
+        # Make query
+        assert type(query) is list, "Query input must be a list"
+        if type(query[0]) is tuple:
+            qmethod = 'union'
+            phrase = f"Performing {qmethod} query..."
+            print(phrase)
+            query_results = qobj.union_query(query, case_sensitive=case_sensitive)
+        elif type(query[0]) is list and type(query[0][0]) is tuple:
+            qmethod = 'intersect'
+            phrase = f"Performing {qmethod} query..."
+            print(phrase)
+            query_results = qobj.intersect_query(query, case_sensitive=case_sensitive)
+        else:
+            raise TypeError('Format of query is not list of tuples (union) or list of lists of tuples (intersection')
+        print("Done!")
+        return query_results, qmethod
+
+    def create_composite_document(self, query, token, method='reduced', buffer_size=0):
+        """DEPRECATED
+        methods = reduced and full
+        buffer_size = number of sentences to add from previous and next page to document"""
+        if not query:
+            print("Sub-collection: ", self.path)
+            print("Creating a composite document using all files in sub-collection...")
+            docs = list(set([file[:-4]+'.txt' if self.path in file else None for file in self.flist]))
+            # parse and compile into composite
+            parsed_docs = reparser(docs, token, method='full')
+            composite_doc_paragraphs = []
+            for d_parser in parsed_docs.values():
+                composite_doc_paragraphs.extend(d_parser.document.paragraphs)
+            print("Done!")
+            return ObjectDocumentModel(composite_doc_paragraphs)
+
+        query_results, qmethod = self.make_query(query)
+        assert query_results, "The collection does not contain results for the specified query. "
+        if method == 'full':
+            print("Creating a composite document using the full constituent documents...")
+            if qmethod == 'union':
+                docs = list(set(
+                    chain.from_iterable([list(query_results[key].keys()) for key in query_results.keys()])))
+            elif qmethod == 'intersect':
+                docs = list(query_results.keys())
+            parsed_docs = reparser(docs, token, method=method)
+            composite_doc_paragraphs = []
+            for d_parser in parsed_docs.values():
+                composite_doc_paragraphs.extend(d_parser.document.paragraphs)
+            print("Done!")
+            return ObjectDocumentModel(composite_doc_paragraphs)
+
+        elif method == 'reduced':
+            print("Creating a composite document using only the relevant pages from constituent documents...")
+            print("Applying a sentence buffer of size", buffer_size) if buffer_size else None
+            if qmethod == 'union':
+                merged_union_dict = dict()
+                for union_phrase in query_results.keys():
+                    for doc, pages in query_results[union_phrase].items():
+                        if doc not in merged_union_dict:
+                            merged_union_dict[doc] = pages
+                        elif pages:
+                            merged_union_dict[doc].update(pages)
+                query_results = merged_union_dict
+            parsed_docs = reparser(query_results, token, method=method, buffer_size=buffer_size)
             composite_doc_paragraphs = []
             for d_parser in parsed_docs.values():
                 composite_doc_paragraphs.extend(d_parser.document.paragraphs)
