@@ -92,7 +92,7 @@
       </rect>
      </property>
     </widget>
-    <widget class="QRadioButton" name="radioButton">
+    <widget class="QRadioButton" name="cqRadioComplement">
      <property name="enabled">
       <bool>false</bool>
      </property>
@@ -340,6 +340,7 @@
     <addaction name="actionSaveAsQL"/>
     <addaction name="actionLoadQL"/>
     <addaction name="actionRefresh"/>
+    <addaction name="actionExportST"/>
    </widget>
    <addaction name="menuTools"/>
   </widget>
@@ -357,7 +358,7 @@
      <normaloff>icons/open.png</normaloff>icons/open.png</iconset>
    </property>
    <property name="text">
-    <string>Load</string>
+    <string>Load Query File</string>
    </property>
   </action>
   <action name="actionRefresh">
@@ -376,6 +377,11 @@
    </property>
    <property name="text">
     <string>Save As</string>
+   </property>
+  </action>
+  <action name="actionExportST">
+   <property name="text">
+    <string>Export to Summary Tool</string>
    </property>
   </action>
  </widget>

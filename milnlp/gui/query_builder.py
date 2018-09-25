@@ -1,6 +1,7 @@
 # main.py
 import sys
 import shelve
+import subprocess
 from os import getcwd, path, remove
 #
 from PySide2.QtUiTools import QUiLoader
@@ -8,11 +9,18 @@ from PySide2.QtWidgets import QApplication
 from PySide2.QtWidgets import QPushButton, QRadioButton, QLineEdit, QCheckBox, QComboBox
 from PySide2.QtWidgets import QAction, QGroupBox, QFileDialog
 from PySide2.QtCore import QFile, QObject, QPersistentModelIndex
-# from PySide2.QtGui import QFont
 #
 from milnlp.collection.topic_model import SimpleQuery, ComplexQuery
 from milnlp.gui.utils import load_query_list, process_query_list
 from milnlp.gui.widgets import PandasModel
+
+
+def open_summary_tool():
+    """Opens the query builder tool from within the summary tool"""
+    if not path.exists("summary_tool.py"):
+        print("The summary tool is not installed.")
+        return 1
+    subprocess.Popen("python summary_tool.py")  #todo add execute paramters to load file from QB
 
 
 class Form(QObject):
@@ -60,6 +68,8 @@ class Form(QObject):
         action_load.triggered.connect(self.load_file)
         action_refresh = self.window.findChild(QAction, 'actionRefresh')
         action_refresh.triggered.connect(self.refresh)
+        action_export = self.window.findChild(QAction, 'actionExportST')
+        action_export.triggered.connect(open_summary_tool)
 
         # QueryList -> QGroupBox
         butt_remove_query = self.window.findChild(QPushButton, 'removeQueryButton')
@@ -326,5 +336,5 @@ class Form(QObject):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    form = Form("mainwindow.ui")
+    form = Form("query_builder.ui")
     sys.exit(app.exec_())

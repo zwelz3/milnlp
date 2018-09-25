@@ -21,7 +21,7 @@ class SingleDocSummarizer(object):
         self.summary = None
         self.words = None
 
-    def process_document(self, file_path):
+    def process_document(self, file_path, num_sentences=5, num_keywords=10):
         """Creates a summary and key words for the single document"""
         # Parse or load file
         needs_parsing = not check_ext(file_path)
@@ -47,8 +47,8 @@ class SingleDocSummarizer(object):
         self.document = create_sumy_dom(document_text, self.token)
 
         # Create summary for document
-        self.summary = self.summarizer(self.document, 5)
+        self.summary = self.summarizer(self.document, num_sentences)
 
         # Phrase extraction using naive unicode candidates and TextRank
         doc_text = ' '.join([sentence._text for sentence in self.document.sentences])  # protected/private access
-        self.words = dict(score_keyphrases_by_textrank(doc_text, n_keywords=0.15))  # results are (candidate, score)
+        self.words = dict(score_keyphrases_by_textrank(doc_text, n_keywords=num_keywords))  # results are (candidate, score)
