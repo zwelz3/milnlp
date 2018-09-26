@@ -16,5 +16,5 @@ from milnlp.collection.utils.qol import doc_to_text
 text = doc_to_text(results.document)
 
 print('\nKey Words/Phrases: ')
-for (word, score) in score_keyphrases_by_textrank(text, n_keywords=.10):
-	print(word, score)
+for (word, score) in score_keyphrases_by_textrank(text, n_keywords=10):
+	print(word, ',', score)

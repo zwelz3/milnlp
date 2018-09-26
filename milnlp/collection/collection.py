@@ -257,14 +257,15 @@ class Collection(object):
         build_supermetadocs(self.dlist)
 
     def create_composite_doc_from_query_object(self, query_object, token, method='reduced', buffer_size=0):
-        """Creates a composite document using the query objects from the GUI query builder tool."""
+        """Creates a composite document using the query objects from the GUI query builder tool.
+           Returns the ODM and the match dictionary (independent of method)"""
         # Check object type
         assert type(query_object) in {SimpleQuery, ComplexQuery}, \
             "ERROR: function only supports processing on SimpleQuery and ComplexQuery objects."
-        # Check if query is already applied
-        if not query_object.processed:
-            print("Applying query...")
-            query_object.apply_query(self.flist)
+        # Check if query is already applied todo add back in later if necessary
+        # if not query_object.processed:
+        #    print("Applying query...")
+        query_object.apply_query(self.flist)  # always reapplying query for now
         # Check to make sure data exists (neither of these should ever trigger.)
         assert query_object.match, "ERROR: The query was not applied successfully."
         assert any(query_object.match.values()), "ERROR: The query did not return any matches in the collection."
@@ -277,7 +278,7 @@ class Collection(object):
             for d_parser in parsed_docs.values():
                 composite_doc_paragraphs.extend(d_parser.document.paragraphs)
             print("Done!")
-            return ObjectDocumentModel(composite_doc_paragraphs)
+            return ObjectDocumentModel(composite_doc_paragraphs), query_object.match
 
         elif method == 'reduced':
             print("Creating a composite document using only the relevant pages from constituent documents...")
@@ -287,7 +288,7 @@ class Collection(object):
             for d_parser in parsed_docs.values():
                 composite_doc_paragraphs.extend(d_parser.document.paragraphs)
             print("Done!")
-            return ObjectDocumentModel(composite_doc_paragraphs)
+            return ObjectDocumentModel(composite_doc_paragraphs), query_object.match
 
     def build_query(self):
         """DEPRECATED
