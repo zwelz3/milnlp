@@ -55,6 +55,7 @@ class Form(QObject):
         self.collection_working_path = getcwd()
         self.cobj = None
         self.document = None
+        self.matches = None
         self.shelf_path = None
         self.shelf_working_path = getcwd()
         self.query_list = []  # visual list for the GUI
@@ -102,6 +103,7 @@ class Form(QObject):
 
         # centralWidget -> queryFiles
         self.line_query_path = self.window.findChild(QPlainTextEdit, 'queryPathInput')
+        self.line_query_path.textChanged.connect(self.check_query_path)
         butt_browse_query_path = self.window.findChild(QPushButton, 'queryBrowseButton')
         butt_browse_query_path.clicked.connect(self.browse_shelf_path)
         self.butt_load_query_path = self.window.findChild(QPushButton, 'queryLoadButton')
@@ -156,6 +158,13 @@ class Form(QObject):
         self.butt_save_results = self.window.findChild(QPushButton, 'saveOutputButton')
         self.butt_save_results.clicked.connect(self.write_results)
 
+        # -----------------------------
+        # tabWidget -> Results Panel
+        # -----------------------------
+
+        # centralWidget -> view matches
+        self.matches_text = self.window.findChild(QPlainTextEdit, 'outputMatches')
+
         # ========
         #   Show
         # ========
@@ -196,10 +205,14 @@ class Form(QObject):
 
     def check_collection_path(self):
         """ """
-        if self.line_collection_path.toPlainText():
+        temp_path = self.line_collection_path.toPlainText()
+        if temp_path and path.exists(temp_path):
             self.butt_process_collection_processing.setEnabled(True)
+            self.collection_path = self.line_collection_path.toPlainText()
+            self.collection_working_path = self.collection_path
         else:
             self.butt_process_collection_processing.setEnabled(False)
+            self.collection_path = None  # Remove collection path to make sure nothing wonky happens
 
     def browse_shelf_path(self):
         """Creates a browse session so the user can locate a shelf file"""
@@ -238,6 +251,17 @@ class Form(QObject):
         """Utility function for menu bar 'load'"""
         self.browse_shelf_path()
         self.load_shelf_file()
+
+    def check_query_path(self):
+        """ """
+        temp_path = self.line_query_path.toPlainText()
+        if temp_path and (path.exists(temp_path) or path.exists(temp_path+'.dir')):
+            self.butt_load_query_path.setEnabled(True)
+            self.shelf_path = self.line_query_path.toPlainText()
+            self.shelf_working_path = self.shelf_path
+        else:
+            self.butt_load_query_path.setEnabled(False)
+            self.shelf_path = None  # Remove shelf path to make sure nothing wonky happens
 
     def refresh(self):
         """Refreshes the UI and verifies that GUI elements are accurate."""
@@ -298,6 +322,7 @@ class Form(QObject):
         token = Tokenizer(LANGUAGE)
         term_frequency_threshold = 0.5
         #
+        self.collection_path = self.line_collection_path.toPlainText()  # make sure the collection path is updated
         self.cobj = Collection(self.collection_path)
         # -------------------------------------
         self.prog_bar.setValue(2)
@@ -351,7 +376,8 @@ class Form(QObject):
             method = "full"
         else:
             method = "reduced"
-        self.document = self.cobj.create_composite_doc_from_query_object(self.queries[-2], token, method=method)
+        # todo only using index -2 at the moment
+        self.document, self.matches = self.cobj.create_composite_doc_from_query_object(self.queries[-2], token, method=method)
         print(f"Using method '{method}' results in: ", self.document)
         self.results = Results()
 
@@ -365,6 +391,7 @@ class Form(QObject):
         self.results.set_words(words)
 
         # Display results
+        self.write_matches_panel()
         self.print_results(method='collection')
         self.write_results_panel(method='collection')
         self.tab_widget.setCurrentIndex(2)
@@ -495,6 +522,37 @@ class Form(QObject):
             print("Done!")
         webbrowser.open(save_path)
 
+    def write_matches_panel(self):
+        """Simple result to display the matching files/pages"""
+        text = self.recursive_level_check(list(self.matches.keys()), self.matches)
+        self.matches_text.setPlainText(text)
+
+    def recursive_level_check(self, files, file_dict, level=1, text=''):
+        sep = '\\'
+        segments = [file.split(sep) for file in files]  # path split into segments
+        groups = {}
+        printed = {}
+        for ii, segment in enumerate(segments):
+            if len(segment) == level:
+                key = sep.join(segment[:level - 1])
+                if key not in printed:
+                    printed[key] = True
+                    text += '\n'+key+sep+'\n'
+                text += ' '+u"\u251C"+'-'+str(segment[-1])+'\n'
+                text += '     Page matches:'+', '.join([str(item) for item in file_dict[files[ii]]])+'\n'
+            elif len(segment) > level:
+                key = sep.join(segment[0:level])
+                if key not in groups:
+                    groups[key] = {files[ii]}
+                else:
+                    groups[key].update({files[ii]})
+
+        # Recursive call if not exhausted
+        if groups:
+            for group in groups.values():
+                text = self.recursive_level_check(list(group), file_dict, level=level + 1, text=text)
+
+        return text
 
 #
 #  Application Below  ----------------------------------------
