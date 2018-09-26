@@ -254,7 +254,8 @@ class Collection(object):
         self.skip_up_to_date()
         create_all_metadocs(self.flist_unprocessed)
         parse_collection(self.flist_unprocessed, summarizer, token, term_frequency_threshold)
-        build_supermetadocs(self.dlist)
+        if False:  # remove creation of SMDOCs until they are used for something since this operation is slow
+            build_supermetadocs(self.dlist)
 
     def create_composite_doc_from_query_object(self, query_object, token, method='reduced', buffer_size=0):
         """Creates a composite document using the query objects from the GUI query builder tool.
@@ -267,8 +268,10 @@ class Collection(object):
         #    print("Applying query...")
         query_object.apply_query(self.flist)  # always reapplying query for now
         # Check to make sure data exists (neither of these should ever trigger.)
-        assert query_object.match, "ERROR: The query was not applied successfully."
-        assert any(query_object.match.values()), "ERROR: The query did not return any matches in the collection."
+        try:
+            assert any(query_object.match), "ERROR: The query did not appear to return any matches in the collection."
+        except AssertionError:
+            return None
 
         if method == 'full':
             print("Creating a composite document using the full constituent documents...")

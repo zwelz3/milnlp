@@ -7,6 +7,7 @@ from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication
 from PySide2.QtWidgets import QPushButton, QRadioButton, QLineEdit, QCheckBox, QComboBox, QPlainTextEdit, QProgressBar
 from PySide2.QtWidgets import QWidget, QAction, QGroupBox, QFileDialog, QLabel, QTextEdit, QSpinBox, QTabWidget
+from PySide2.QtWidgets import QMessageBox
 from PySide2.QtCore import QFile, QObject, QPersistentModelIndex, QCoreApplication
 #
 from milnlp.gui.utils import load_query_list, process_query_list
@@ -114,6 +115,9 @@ class Form(QObject):
         # centralWidget -> querySelection
         self.combo_query = self.window.findChild(QComboBox, 'queriesCombo')
         self.combo_query.currentIndexChanged.connect(self.set_query_combo)
+
+        # centralWidget -> Query Options
+        self.spin_sentence_buffer = self.window.findChild(QSpinBox, 'spinSentenceBuffer')
 
         # centralWidget -> Summary Options
         self.radio_full = self.window.findChild(QRadioButton, 'radioFull')
@@ -342,7 +346,7 @@ class Form(QObject):
 
     def apply_query(self):
         """
-        todo lots and lots of work
+         Executes after the 'Generate Results' button is pressed.
         """
         #
         LANGUAGE = "english"
@@ -376,28 +380,39 @@ class Form(QObject):
             method = "full"
         else:
             method = "reduced"
-        # todo only using index -2 at the moment
-        self.document, self.matches = self.cobj.create_composite_doc_from_query_object(self.queries[-2], token, method=method)
-        print(f"Using method '{method}' results in: ", self.document)
-        self.results = Results()
 
-        # Generate summary  # todo # sentences not working
-        reduced_summary = self.cobj.summarize_composite(self.document, summarizer, self.num_sentences)
-        self.results.set_summary(reduced_summary)
+        query_to_apply = self.queries[self.combo_query.currentIndex()]
+        try:
+            buffer_size = self.spin_sentence_buffer.value()
+            self.document, self.matches = self.cobj.create_composite_doc_from_query_object(query_to_apply,
+                                                                                           token,
+                                                                                           method=method,
+                                                                                           buffer_size=buffer_size)
+            print(f"Using method '{method}' results in: ", self.document)
+            self.results = Results()
 
-        # Generate key words/phrases
-        text = doc_to_text(self.document)
-        words = dict(score_keyphrases_by_textrank(text, self.num_keywords))
-        self.results.set_words(words)
+            # Generate summary  # todo # sentences not working
+            reduced_summary = self.cobj.summarize_composite(self.document, summarizer, self.num_sentences)
+            self.results.set_summary(reduced_summary)
 
-        # Display results
-        self.write_matches_panel()
-        self.print_results(method='collection')
-        self.write_results_panel(method='collection')
-        self.tab_widget.setCurrentIndex(2)
+            # Generate key words/phrases
+            text = doc_to_text(self.document)
+            words = dict(score_keyphrases_by_textrank(text, self.num_keywords))
+            self.results.set_words(words)
+
+            # Display results
+            self.write_matches_panel()
+            self.print_results(method='collection')
+            self.write_results_panel(method='collection')
+            self.tab_widget.setCurrentIndex(2)
+        except TypeError:
+            # No matches for query, therefore different return route
+            msg_box = QMessageBox()
+            msg_box.setText('The query returned no matches for the specified collection.')
+            msg_box.exec_()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    #     SEPARATE TAB/PANEL BELOW
+    #     SINGLE DOCUMENT TAB/PANEL BELOW
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def set_sentences(self):
@@ -415,6 +430,7 @@ class Form(QObject):
         file_path = self.line_file_path.toPlainText()
         if file_path and path.exists(file_path):
             self.butt_summarize.setEnabled(True)
+            self.file_path = file_path
         else:
             self.butt_summarize.setEnabled(False)
 
@@ -538,7 +554,7 @@ class Form(QObject):
                 if key not in printed:
                     printed[key] = True
                     text += '\n'+key+sep+'\n'
-                text += ' '+u"\u251C"+'-'+str(segment[-1])+'\n'
+                text += ' '+u"\u251C"+'- '+str(segment[-1])+'\n'
                 text += '     Page matches:'+', '.join([str(item) for item in file_dict[files[ii]]])+'\n'
             elif len(segment) > level:
                 key = sep.join(segment[0:level])
