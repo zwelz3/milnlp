@@ -532,11 +532,12 @@ class Form(QObject):
             save_path = self.working_path
         (save_path, ext) = QFileDialog.getSaveFileName(None, "Specify File to Save",
                                                        save_path, "Results file (*.results)")
-        with open(save_path, 'w') as ofile:
-            print("\nWriting results to:", save_path)
-            ofile.write(self.results_text.toPlainText())
-            print("Done!")
-        webbrowser.open(save_path)
+        if save_path:
+            with open(save_path, 'w') as ofile:
+                print("\nWriting results to:", save_path)
+                ofile.write(self.results_text.toPlainText())
+                print("Done!")
+            webbrowser.open(save_path)
 
     def write_matches_panel(self):
         """Simple result to display the matching files/pages"""
