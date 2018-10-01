@@ -281,12 +281,12 @@ class Form(QObject):
             print("INFO: Using the default selected queries.")
             self.set_cq()
         # Get method from radio buttons
-        if form.union_radio.isChecked():
+        if self.union_radio.isChecked():
             method = 'union'
-        elif form.intersect_radio.isChecked():
+        elif self.intersect_radio.isChecked():
             method = 'intersection'
         # Build the complex query
-        key_list = [self.queries[form.cq_left].UUID, self.queries[form.cq_right].UUID]
+        key_list = [self.queries[self.cq_left].UUID, self.queries[self.cq_right].UUID]
         cq_inst = ComplexQuery(key_list, method, object_list=self.queries)
         self.queries.append(cq_inst)
         self.query_list = process_query_list(self.queries)  # todo replace with only having to append newest
