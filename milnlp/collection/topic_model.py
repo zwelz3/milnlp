@@ -203,6 +203,7 @@ class ComplexQuery(AbstractQuery):
             self.union_query(file_set, shelf_path=shelf_path)
         else:
             self.intersection_query(file_set, shelf_path=shelf_path)
+
         self.processed = True
 
         # Update shelve
@@ -242,8 +243,11 @@ class ComplexQuery(AbstractQuery):
                 dependency.apply_query(file_set, shelf_path=shelf_path)
 
         # Get set_list for matches
-        set_list = [set(dependency.match.keys()) for dependency in self._dependencies]
-        intersection = set.intersection(*set_list)
+        try:
+            set_list = [set(dependency.match.keys()) for dependency in self._dependencies]
+            intersection = set.intersection(*set_list)
+        except AttributeError:
+            intersection = None
 
         # For each file that matches the intersection operator, take the union of the pages
         # todo take intersection of pages

@@ -17,6 +17,7 @@ from sumy.utils import get_stop_words
 from milnlp.collection.collection import Collection
 from milnlp.tokenizers import Tokenizer
 from sumy.summarizers.lsa import LsaSummarizer as Summarizer
+from sumy.summarizers.lex_rank import LexRankSummarizer as LexSummarizer
 from milnlp.sumyplus.SingleDocSummarizer import SingleDocSummarizer
 
 #
@@ -24,12 +25,31 @@ from milnlp.collection.utils.qol import doc_to_text
 from milnlp.mining.phrases import score_keyphrases_by_textrank
 
 
+def purge_matches(query):
+    """purges all matches from query object"""
+    query.match = None
+    query.processed = False
+    if query.type == 'complex':
+        for dependency in query._dependencies:
+            purge_matches(dependency)
+
+
 def open_query_builder():
     """Opens the query builder tool from within the summary tool"""
-    if not path.exists("query_builder.py"):
+    loc = path.dirname(__file__)
+    if not loc:
+        loc = getcwd()
+    if not path.exists(loc+'\\'+"query_builder.py"):
         print("The query builder tool is not installed.")
         return 1
-    subprocess.Popen("python query_builder.py")
+    subprocess.Popen('python -c "from milnlp.gui import query_builder; query_builder.run()"')
+
+
+def run():
+    app = QApplication(sys.argv)
+    loc = path.dirname(__file__)
+    form = Form(loc+'\\'+"summary_tool.ui", app)
+    sys.exit(app.exec_())
 
 
 class Form(QObject):
@@ -51,8 +71,7 @@ class Form(QObject):
         # Instantiate some window properties
         # ===================================
         # Collection
-        # self.collection_path = None  # todo, in GUI disable execute button and remove text by default
-        self.collection_path = r"C:\Users\zwelz3\Documents\GTRI_Projects\ECCT_EW_EMS\Market Research Sample"
+        self.collection_path = None
         self.collection_working_path = getcwd()
         self.cobj = None
         self.document = None
@@ -65,8 +84,7 @@ class Form(QObject):
         self.selected_query = None
 
         # Single Document
-        # self.file_path = None  # todo uncomment
-        self.file_path = r"C:/Users/zwelz3/Documents/GTRI_Projects/ECCT_EW_EMS/Market Research Sample/Hypersonic Weapons/Lockheed Martin tasked with developing hypersonic missiles.pdf"
+        self.file_path = None
         self.working_path = getcwd()
 
         # Mutual
@@ -210,6 +228,10 @@ class Form(QObject):
     def check_collection_path(self):
         """ """
         temp_path = self.line_collection_path.toPlainText()
+
+        self.prog_bar.setValue(0)
+        self.prog_label.setText("")
+
         if temp_path and path.exists(temp_path):
             self.butt_process_collection_processing.setEnabled(True)
             self.collection_path = self.line_collection_path.toPlainText()
@@ -321,7 +343,7 @@ class Form(QObject):
         # ------------------------------------
         LANGUAGE = "english"
         stemmer = Stemmer(LANGUAGE)
-        summarizer = Summarizer(stemmer)
+        summarizer = LexSummarizer(stemmer)
         summarizer.stop_words = get_stop_words(LANGUAGE)
         token = Tokenizer(LANGUAGE)
         term_frequency_threshold = 0.5
@@ -348,7 +370,6 @@ class Form(QObject):
         """
          Executes after the 'Generate Results' button is pressed.
         """
-        #
         LANGUAGE = "english"
         stemmer = Stemmer(LANGUAGE)
         summarizer = Summarizer(stemmer)
@@ -382,6 +403,9 @@ class Form(QObject):
             method = "reduced"
 
         query_to_apply = self.queries[self.combo_query.currentIndex()]
+        # pre-process
+        purge_matches(query_to_apply)
+
         try:
             buffer_size = self.spin_sentence_buffer.value()
             self.document, self.matches = self.cobj.create_composite_doc_from_query_object(query_to_apply,
@@ -556,7 +580,7 @@ class Form(QObject):
                     printed[key] = True
                     text += '\n'+key+sep+'\n'
                 text += ' '+u"\u251C"+'- '+str(segment[-1])+'\n'
-                text += '     Page matches:'+', '.join([str(item) for item in file_dict[files[ii]]])+'\n'
+                text += '     Page matches:'+', '.join([str(item+1) for item in file_dict[files[ii]]])+'\n'
             elif len(segment) > level:
                 key = sep.join(segment[0:level])
                 if key not in groups:
@@ -578,5 +602,8 @@ class Form(QObject):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    form = Form("summary_tool.ui", app)
+    loc = path.dirname(__file__)
+    if not loc:
+        loc = getcwd()
+    form = Form(loc + '\\' + "summary_tool.ui", app)
     sys.exit(app.exec_())
