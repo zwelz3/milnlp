@@ -333,13 +333,16 @@
        <enum>QPlainTextEdit::NoWrap</enum>
       </property>
       <property name="plainText">
-       <string>C:\Users\zwelz3\Documents\GTRI_Projects\ECCT_EW_EMS\Market Research Sample</string>
+       <string/>
       </property>
       <property name="placeholderText">
        <string>Enter location of collection root...</string>
       </property>
      </widget>
      <widget class="QPushButton" name="processButton">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
       <property name="geometry">
        <rect>
         <x>220</x>
@@ -794,7 +797,7 @@
        <enum>QPlainTextEdit::NoWrap</enum>
       </property>
       <property name="plainText">
-       <string>C:/Users/zwelz3/Documents/GTRI_Projects/ECCT_EW_EMS/Market Research Sample/Hypersonic Weapons/Lockheed Martin tasked with developing hypersonic missiles.pdf</string>
+       <string/>
       </property>
       <property name="placeholderText">
        <string>Enter path to file...</string>

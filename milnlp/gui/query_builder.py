@@ -16,11 +16,19 @@ from milnlp.gui.widgets import PandasModel
 
 
 def open_summary_tool():
-    """Opens the query builder tool from within the summary tool"""
+    """Opens the query builder tool from within the summary tool
+    TODO fix on export implementation"""
     if not path.exists("summary_tool.py"):
         print("The summary tool is not installed.")
         return 1
     subprocess.Popen("python summary_tool.py")  #todo add execute paramters to load file from QB
+
+
+def run():
+    app = QApplication(sys.argv)
+    loc = path.dirname(__file__)
+    form = Form(loc + '\\' + "query_builder.ui", app)
+    sys.exit(app.exec_())
 
 
 class Form(QObject):
@@ -179,7 +187,7 @@ class Form(QObject):
         self.working_path = path.dirname(filename)  # Note* using filename not shelf_path which is custom for shelf
         # Update simple/complex query classes with latest UUID position
         temp_dict = {}
-        for UUID in [item.UUID for item in form.queries]:
+        for UUID in [item.UUID for item in self.queries]:
             qtype, index = UUID.split('_')
             if qtype in temp_dict:
                 temp_dict[qtype] = max(temp_dict[qtype], int(index))
@@ -336,5 +344,8 @@ class Form(QObject):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    form = Form("query_builder.ui")
+    loc = path.dirname(__file__)
+    if not loc:
+        loc = getcwd()
+    form = Form(loc + '\\' + "query_builder.ui", app)
     sys.exit(app.exec_())

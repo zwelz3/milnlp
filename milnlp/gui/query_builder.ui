@@ -263,7 +263,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Allow Special Delimeters ( , -   )</string>
+      <string>Allow Special Delimiters ( , -   )</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="pluralsCheck">
@@ -380,6 +380,9 @@
    </property>
   </action>
   <action name="actionExportST">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Export to Summary Tool</string>
    </property>
