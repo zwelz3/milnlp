@@ -19,7 +19,6 @@ setup(
         "pycountry>=18.2.23",
         "nltk>=3.0.2",
         "sumy>=0.7.0",
-        "pyqt==5.6.0",
         "pyside2",
         "pdfminer.six"
     ],)
