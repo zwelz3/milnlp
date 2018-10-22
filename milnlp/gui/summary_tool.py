@@ -415,6 +415,17 @@ class Form(QObject):
             print(f"Using method '{method}' results in: ", self.document)
             self.results = Results()
 
+            # Generate message box to confirm the user wants a summary to be generated
+            msgBox = QMessageBox()  # todo add window name
+            msgBox.setText(f"The composite document has been created. It contains {len(self.document.sentences)} "
+                           f"sentences. Do you want to summarize the document?")
+            msgBox.setInformativeText("")
+            msgBox.setStandardButtons(QMessageBox.No | QMessageBox.Yes)
+            msgBox.setDefaultButton(QMessageBox.Yes)
+            ret = msgBox.exec_()
+            if ret == QMessageBox.No:
+                return 0
+
             # Generate summary  # todo # sentences not working
             reduced_summary = self.cobj.summarize_composite(self.document, summarizer, self.num_sentences)
             self.results.set_summary(reduced_summary)
