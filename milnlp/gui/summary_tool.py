@@ -516,8 +516,10 @@ class Form(QObject):
             text = text + f" *  {sentence}\n\n"
         text = text + "\n==================================\n" \
                       "Key Words/Phrases: \n==================================\n"
-        for word, score in self.results.words.items():
-            text = text + f"{'%.6f'%score},\t{word}\n"
+        for ii, item in enumerate(self.results.words.items()):
+            if ii >= self.num_keywords:
+                break
+            text = text + f"{'%.6f'%item[1]},\t{item[0]}\n"
         self.results_text.setPlainText(text)
 
     def print_results(self, method='single'):
@@ -543,8 +545,10 @@ class Form(QObject):
         print("\n==================================\n"
               "Key Words/Phrases: \n"
               "==================================\n")
-        for word, score in self.results.words.items():
-            print(f"{'%.6f'%score},\t{word}")
+        for ii, item in enumerate(self.results.words.items()):
+            if ii >= self.num_keywords:
+                break
+            print(f"{'%.6f'%item[1]},\t{item[0]}")
 
     def write_results(self):
         """Write formatted results to file."""

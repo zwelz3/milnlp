@@ -17,8 +17,10 @@ setup(
     ],
     install_requires=[
         "pycountry>=18.2.23",
+        "networkx",
         "nltk>=3.0.2",
-        "sumy>=0.7.0",
+        "pandas",
         "pyside2",
-        "pdfminer.six"
+        "pdfminer.six",
+        "sumy>=0.7.0"
     ],)

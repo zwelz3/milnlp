@@ -16,4 +16,4 @@ with the label `QT_QPA_PLATFORM_PLUGIN_PATH`.
 
 Restart your console. 
 
-Note** Make sure your target display is set to 1920x1080 resolution and the scale is set to 100% or their will be GUI sizing issues. 
+Note** Make sure your target display is set to 1920x1080 resolution and the scale is set to 100% or their may be GUI sizing issues. 
