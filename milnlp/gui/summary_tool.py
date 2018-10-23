@@ -444,6 +444,7 @@ class Form(QObject):
             msgBox.setDefaultButton(QMessageBox.Yes)
             ret = msgBox.exec_()
             if ret == QMessageBox.No:
+                self.write_matches_panel()
                 return 0  # cancel the task
 
             # Generate summary  # todo # sentences not working
