@@ -133,6 +133,8 @@ class Form(QObject):
         # centralWidget -> querySelection
         self.combo_query = self.window.findChild(QComboBox, 'queriesCombo')
         self.combo_query.currentIndexChanged.connect(self.set_query_combo)
+        self.clear_query = self.window.findChild(QPushButton, 'clearQueryButton')
+        self.clear_query.clicked.connect(self.clear_query_box)
 
         # centralWidget -> Query Options
         self.spin_sentence_buffer = self.window.findChild(QSpinBox, 'spinSentenceBuffer')
@@ -236,6 +238,8 @@ class Form(QObject):
             self.butt_process_collection_processing.setEnabled(True)
             self.collection_path = self.line_collection_path.toPlainText()
             self.collection_working_path = self.collection_path
+            #
+            self.butt_apply_query.setEnabled(False)  # if collection path is changed, require re-process
         else:
             self.butt_process_collection_processing.setEnabled(False)
             self.collection_path = None  # Remove collection path to make sure nothing wonky happens
@@ -331,6 +335,9 @@ class Form(QObject):
         if self.combo_query.currentIndex() >= 0:
             self.butt_apply_query.setEnabled(True)
 
+    def clear_query_box(self):
+        self.combo_query.setCurrentIndex(-1)
+
     def process_configuration(self):
         """ """
         # ========================================================================================
@@ -365,6 +372,7 @@ class Form(QObject):
         # ========================================================================================
         self.prog_label.setText("Done!")
         self.butt_process_collection_processing.setEnabled(True)
+        self.butt_apply_query.setEnabled(True)
 
     def apply_query(self):
         """
@@ -402,17 +410,29 @@ class Form(QObject):
         else:
             method = "reduced"
 
-        query_to_apply = self.queries[self.combo_query.currentIndex()]
-        # pre-process
-        purge_matches(query_to_apply)
-
         try:
             buffer_size = self.spin_sentence_buffer.value()
-            self.document, self.matches = self.cobj.create_composite_doc_from_query_object(query_to_apply,
-                                                                                           token,
-                                                                                           method=method,
-                                                                                           buffer_size=buffer_size)
-            print(f"Using method '{method}' results in: ", self.document)
+
+            if self.combo_query.currentIndex() > -1:  # execute for query
+                query_to_apply = self.queries[self.combo_query.currentIndex()]
+                purge_matches(query_to_apply)
+                self.document, self.matches = self.cobj.create_composite_doc_from_query_object(query_to_apply,
+                                                                                               token,
+                                                                                               method=method,
+                                                                                               buffer_size=buffer_size)
+                print(f"Using method '{method}' results in: ", self.document)
+
+            else:  # execute for entire sub-collection
+                from sumy.models.dom import ObjectDocumentModel
+                from ..collection.collection import reparser
+
+                files = [file[:-4]+'.txt' for file in self.cobj.flist]
+                parsed_docs = reparser(files, token, method='full')
+                composite_doc_paragraphs = []
+                for d_parser in parsed_docs.values():
+                    composite_doc_paragraphs.extend(d_parser.document.paragraphs)
+                self.document, self.matches = ObjectDocumentModel(composite_doc_paragraphs), None
+
             self.results = Results()
 
             # Generate message box to confirm the user wants a summary to be generated
@@ -424,7 +444,7 @@ class Form(QObject):
             msgBox.setDefaultButton(QMessageBox.Yes)
             ret = msgBox.exec_()
             if ret == QMessageBox.No:
-                return 0
+                return 0  # cancel the task
 
             # Generate summary  # todo # sentences not working
             reduced_summary = self.cobj.summarize_composite(self.document, summarizer, self.num_sentences)
@@ -580,7 +600,10 @@ class Form(QObject):
 
     def write_matches_panel(self):
         """Simple result to display the matching files/pages"""
-        text = self.recursive_level_check(list(self.matches.keys()), self.matches)
+        if self.combo_query.currentIndex() > -1:
+            text = self.recursive_level_check(list(self.matches.keys()), self.matches)
+        else:
+            text = ""  # erase any text to be sure
         self.matches_text.setPlainText(text)
 
     def recursive_level_check(self, files, file_dict, level=1, text=''):
