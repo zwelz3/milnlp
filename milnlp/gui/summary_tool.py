@@ -286,6 +286,7 @@ class Form(QObject):
         """ """
         temp_path = self.line_query_path.toPlainText()
         if temp_path and (path.exists(temp_path) or path.exists(temp_path+'.dir')):
+            self.butt_load_query_path.setText("Load")
             self.butt_load_query_path.setEnabled(True)
             self.shelf_path = self.line_query_path.toPlainText()
             self.shelf_working_path = self.shelf_path
@@ -328,12 +329,11 @@ class Form(QObject):
                     self.combo_query.setItemText(index, self.formatted_queries[index])
                 else:
                     self.combo_query.addItem(self.formatted_queries[index])
+        self.combo_query.setCurrentIndex(0)
 
     def set_query_combo(self):
         """Set attribute for identifying the selected query"""
         self.selected_query = self.combo_query.currentIndex()
-        if self.combo_query.currentIndex() >= 0:
-            self.butt_apply_query.setEnabled(True)
 
     def clear_query_box(self):
         self.combo_query.setCurrentIndex(-1)
@@ -535,11 +535,14 @@ class Form(QObject):
         else:
             text = text + f"Collection path: {self.collection_path}\n"
             text = text + "\nQueries:\n"
-            for ii, query in enumerate(self.formatted_queries):
-                if ii == self.combo_query.currentIndex():
-                    text = text + f"->\t{ii+1}) {query}\n"
-                else:
-                    text = text + f"\t{ii+1}) {query}\n"
+            if self.combo_query.currentIndex() != -1:
+                for ii, query in enumerate(self.formatted_queries):
+                    if ii == self.combo_query.currentIndex():
+                        text = text + f"->\t{ii+1}) {query}\n"
+                    else:
+                        text = text + f"\t{ii+1}) {query}\n"
+            else:
+                text = text + "  None.\n"
         text = text + f"\n# Summary Sentences: {self.num_sentences}\n"
         text = text + f"# Key Words/Phrases: {self.num_keywords}\n\n"
         text = text + "==================================\n" \
@@ -562,11 +565,14 @@ class Form(QObject):
         else:
             print(f"Collection path: {self.collection_path}")
             print("\nQueries:")
-            for ii, query in enumerate(self.formatted_queries):
-                if ii == self.combo_query.currentIndex():
-                    print(f"->\t{ii+1}) {query}")
-                else:
-                    print(f"\t{ii+1}) {query}")
+            if self.combo_query.currentIndex() != -1:
+                for ii, query in enumerate(self.formatted_queries):
+                    if ii == self.combo_query.currentIndex():
+                        print(f"->\t{ii+1}) {query}")
+                    else:
+                        print(f"\t{ii+1}) {query}")
+            else:
+                print("  None.")
         print(f"\n# Summary Sentences: {self.num_sentences}")
         print(f"# Key Words/Phrases: {self.num_keywords}\n")
         print("==================================\n"
