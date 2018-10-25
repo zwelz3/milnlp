@@ -223,11 +223,14 @@ class ComplexQuery(AbstractQuery):
 
             # print("Name:", dependency.UUID, "Type:", dependency.type)
             # print(dependency.match)
-            for file, pages in dependency.match.items():
-                if file not in self.match.keys():
-                    self.match[file] = set(pages)
-                else:
-                    self.match[file].update(set(pages))
+            try:  # todo, if only one returns a match, do we still want it to return matches??
+                for file, pages in dependency.match.items():
+                    if file not in self.match.keys():
+                        self.match[file] = set(pages)
+                    else:
+                        self.match[file].update(set(pages))
+            except AttributeError:  # todo for now, No
+                self.match = None
 
         # Convert pages in match back to list for continuity and order
         for file in self.match:
