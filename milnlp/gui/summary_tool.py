@@ -2,6 +2,7 @@ import sys
 import shelve
 import subprocess
 from os import getcwd, path, remove
+from collections import OrderedDict
 #
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication
@@ -10,19 +11,17 @@ from PySide2.QtWidgets import QWidget, QAction, QGroupBox, QFileDialog, QLabel, 
 from PySide2.QtWidgets import QMessageBox
 from PySide2.QtCore import QFile, QObject, QPersistentModelIndex, QCoreApplication
 #
-from milnlp.gui.utils import load_query_list, process_query_list
-#
 from sumy.nlp.stemmers import Stemmer
 from sumy.utils import get_stop_words
-from milnlp.collection.collection import Collection
-from milnlp.tokenizers import Tokenizer
+from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lsa import LsaSummarizer as Summarizer
 from sumy.summarizers.lex_rank import LexRankSummarizer as LexSummarizer
-from milnlp.sumyplus.SingleDocSummarizer import SingleDocSummarizer
-
 #
+from milnlp.gui.utils import load_query_list, process_query_list
+from milnlp.collection.collection import Collection
 from milnlp.collection.utils.qol import doc_to_text
 from milnlp.mining.phrases import score_keyphrases_by_textrank
+from milnlp.sumyplus.SingleDocSummarizer import SingleDocSummarizer
 
 
 def purge_matches(query):
@@ -453,7 +452,7 @@ class Form(QObject):
 
             # Generate key words/phrases
             text = doc_to_text(self.document)
-            words = dict(score_keyphrases_by_textrank(text, self.num_keywords))
+            words = OrderedDict(score_keyphrases_by_textrank(text, self.num_keywords))
             self.results.set_words(words)
 
             # Display results

@@ -1,7 +1,9 @@
+from collections import OrderedDict
+#
 from milnlp.collection.utils.filesystem import check_ext
 from milnlp.parsers.pdf import pdf_parser
 from milnlp.mining.phrases import score_keyphrases_by_textrank
-from milnlp.converters.text_utils import RawTextProcessing
+from milnlp.converters.new_text_utils import RawTextProcessing
 from milnlp.converters.pdf_to_text import create_sumy_dom
 #
 from sumy.nlp.stemmers import Stemmer
@@ -38,10 +40,7 @@ class SingleDocSummarizer(object):
                 document_text = txt_file.read().decode('utf-8')
 
         # Pre-process
-        for attr in RawTextProcessing.order:
-            # Uses the order of RawTextProcessing to apply functions to process into document text
-            processing_func = getattr(RawTextProcessing, attr)
-            document_text = processing_func(document_text)
+        document_text = RawTextProcessing.process_raw_into_lines(document_text, self.token)
 
         # Parse data into sumy document object
         self.document = create_sumy_dom(document_text, self.token)
@@ -51,4 +50,4 @@ class SingleDocSummarizer(object):
 
         # Phrase extraction using naive unicode candidates and TextRank
         doc_text = ' '.join([sentence._text for sentence in self.document.sentences])  # protected/private access
-        self.words = dict(score_keyphrases_by_textrank(doc_text, n_keywords=num_keywords))  # results are (candidate, score)
+        self.words = OrderedDict(score_keyphrases_by_textrank(doc_text, n_keywords=num_keywords))  # results are (candidate, score)
