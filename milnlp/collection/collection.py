@@ -4,12 +4,13 @@ import json
 import subprocess
 #
 from itertools import chain
+from collections import OrderedDict
 #
 from .metadoc import create_all_metadocs, build_supermetadocs
 from .topic_model import SimpleQuery, ComplexQuery
 from .legacy_query import Query
 #
-from ..converters.text_utils import process_raw_into_lines
+from ..converters.new_text_utils import RawTextProcessing
 from ..converters.pdf_to_text import create_sumy_dom
 from ..parsers.pdf import pdf_parser
 from ..mining.phrases import score_keyphrases_by_textrank
@@ -69,7 +70,7 @@ def parse_collection(flist, summarizer, token, keep_file=True):
                     continue
 
                 # Pre-process
-                document_text = process_raw_into_lines(document_text)
+                document_text = RawTextProcessing.process_raw_into_lines(document_text, token)
 
                 # Parse data into document
                 document = create_sumy_dom(document_text, token)
@@ -79,7 +80,7 @@ def parse_collection(flist, summarizer, token, keep_file=True):
                 # print("\nNaive document summary: \n", metasummary)
                 # Phrase extraction using naive unicode candidates and TextRank
                 doc_text = ' '.join([sentence._text for sentence in document.sentences])
-                metawords = dict(score_keyphrases_by_textrank(doc_text,
+                metawords = OrderedDict(score_keyphrases_by_textrank(' '.join(document_text),
                                                               n_keywords=0.95))  # if n < 1 it returns the percentage of results
                 # these restults are now (candidate, PageRank score) format not (word, counts)
                 # print("\nWords for metadata document: \n", metawords)
@@ -137,7 +138,7 @@ def reparser(docs, token, method='full', buffer_size=0):
                 document_text = txt_file.read().decode('utf-8')
 
             # Pre-process
-            document_text = process_raw_into_lines(document_text)
+            document_text = RawTextProcessing.process_raw_into_lines(document_text, token)
 
             # Parse data into document
             document = create_sumy_dom(document_text, token)
@@ -170,7 +171,7 @@ def reparser(docs, token, method='full', buffer_size=0):
                             # get raw page text
                             single_page_raw = raw_document_text[starting_pos:page_break]
                             # Convert to sentences
-                            sentences = process_raw_into_lines(single_page_raw)
+                            sentences = RawTextProcessing.process_raw_into_lines(single_page_raw, token)
 
                         if ii - 1 in pages:  # previous page was in pages
                             # Add buffer to page text using material from beginning of page
@@ -186,7 +187,7 @@ def reparser(docs, token, method='full', buffer_size=0):
             document_text = '\f'.join(page_text)
             f_ind += 1
 
-            document_text = process_raw_into_lines(document_text)
+            document_text = RawTextProcessing.process_raw_into_lines(document_text, token)
 
             # Parse data into document
             document = create_sumy_dom(document_text, token)
